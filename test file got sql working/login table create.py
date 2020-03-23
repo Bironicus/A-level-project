@@ -1,0 +1,172 @@
+from tkinter import *
+import tkinter.messagebox
+from tkinter.ttk import Combobox
+import time
+import math
+import sqlite3
+import base64
+
+
+
+
+class Login(object):
+    def __init__(self,master):
+        self.master = master
+        self.master.geometry("400x400")
+        self.master.wm_title("Login Window") # initialises menu window
+
+        self.Username = StringVar()
+        self.Password = StringVar()
+
+        self.Username.set("io")
+        self.Password.set("biggerbanana")
+
+
+        windowtitle = "Tkinter Weight on a spring oscillator"
+        notificationtext = "Enter your username and password"
+        self.Title = Label(self.master, text=windowtitle).grid(row=0,column=0,columnspan=3)
+        self.UsernameLabel = Label(self.master, text="Username").grid(row=1,column=0)
+        self.PasswordLabel = Label(self.master, text="Password").grid(row=2,column=0)
+        self.NotificationLabel = Label(self.master, text=notificationtext).grid(row=5,column=0,columnspan=3)
+        
+        self.UsernameEntry = Entry(self.master, textvariable=self.Username).grid(row=1,column=1,columnspan=2)
+        self.PasswordEntry = Entry(self.master, textvariable=self.Password).grid(row=2,column=1,columnspan=2)
+
+        self.LoginButton = Button(self.master,text="Login",command=self.Login).grid(row=4,column=0)
+        self.RegisterButton = Button(self.master,text="Register",command=self.Register).grid(row=4,column=1)
+        self.CloseButton = Button(self.master,text="Close",command=self.close).grid(row=4,column=2)
+
+
+        self.regError = "This user already registered in the database" # error codes
+        self.loginError = "This user is not registered in the database"
+        self.unError = "Username box cannot be blank"
+        self.pwError = "Password box cannot be blank"
+
+        self.createLoginTable()
+
+
+
+    def createLoginTable(self):
+        db_name = "UserInfo.db"
+        try:
+            table_name = "UserInfo"
+            sql = """create table Login
+                                (UserID integer,
+                                Username string,
+                                Password string,
+                                primary key (UserID))"""
+            with sqlite3.connect(db_name) as db:
+                cursor = db.cursor()
+                cursor.execute("drop table if exists {0}".format(table_name))
+                cursor.execute("select name from sqlite_master where name = ?",(table_name,))
+                cursor.execute(sql)
+                db.commit()
+                
+        except sqlite3.OperationalError:
+            pass
+        
+    def close(self):
+        quit()
+    
+    def generateUserID(self):
+        with sqlite3.connect("UserInfo.db") as db:
+            cursor = db.cursor()
+            cursor.execute("""select * from Login""")
+            self.allfiledetails = cursor.fetchall()
+        self.newUserID = len(self.allfiledetails) +1
+
+
+    def encryptPassword(self,password):
+        encryptedPassword = str(base64.b64encode(password.encode("utf-8")))
+        passwordlen = len(encryptedPassword)
+        self.encryptedPassword = encryptedPassword[2:passwordlen-1]
+
+    def decryptPassword(self,password):
+        self.decryptedPassword = base64.b64decode(password).decode("utf-8")
+
+        
+
+    def Register(self):
+        #call input username and password
+        Username = self.Username.get()
+        Password = self.Password.get()
+
+        #call all usernames currently in table Login for check
+        self.usernamelist = []
+        with sqlite3.connect("UserInfo.db") as db:
+            cursor = db.cursor()
+            sql = """select Username from Login"""
+            cursor.execute(sql)
+            self.allfiledetails = cursor.fetchall()
+        for index in self.allfiledetails:
+            self.usernamelist.append(index[0])
+        db.commit()
+
+        #error handling input
+        if Username == "":
+            tkinter.messagebox.showinfo('Error!',self.unError)
+        elif Password == "":
+            tkinter.messagebox.showinfo('Error!',self.pwError)
+        elif Username in self.usernamelist:
+            tkinter.messagebox.showinfo('Error!',self.regError)    
+        else: # Username and password have passed the checks, can be committed to database
+
+            self.generateUserID()
+            self.encryptPassword(Password)
+            
+            #username and password are input into table
+            with sqlite3.connect("UserInfo.db") as db:
+                cursor = db.cursor()
+                sql = """insert into Login values (?,?,?)"""
+                temp = (self.newUserID,Username,self.encryptedPassword)
+                #uses the length of usernamelist so the new record is appended to the end of the table
+                cursor.execute(sql,temp)
+                db.commit()
+
+            ###ENTER MENU
+
+
+    def Login(self):
+        #call input username and password
+        Username = self.Username.get()
+        Password = self.Password.get()
+
+        #call all usernames currently in table Login for check
+        self.usernamelist = []
+        with sqlite3.connect("UserInfo.db") as db:
+            cursor = db.cursor()
+            sql = """select Username from Login"""
+            cursor.execute(sql)
+            self.allfiledetails = cursor.fetchall()
+        for index in self.allfiledetails:
+            self.usernamelist.append(index[0])
+        db.commit()
+
+        #error handling input
+        if Username == "":
+            tkinter.messagebox.showinfo('Error!',self.unError)
+        elif Password == "":
+            tkinter.messagebox.showinfo('Error!',self.pwError)
+        elif Username not in self.usernamelist:
+            tkinter.messagebox.showinfo('Error!',self.loginError)
+            
+        else: #decrypt password in db
+            with sqlite3.connect("UserInfo.db") as db:
+                cursor = db.cursor()
+                cursor.execute("select Password from Login where Username where =?", (Username,)) #########
+                encryptedpassword = cursor.fetchone()
+                print(encryptedpassword)
+
+
+##            # Username and password have passed the checks, the user can access the menu
+##
+##            self.generateUserID()
+##            self.encryptPassword(Password)
+##
+##            ###ENTER MENU
+
+
+
+if __name__ == "__main__":
+    root = Tk()
+    login = Login(root)
